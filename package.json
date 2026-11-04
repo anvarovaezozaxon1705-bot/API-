@@ -1,0 +1,13 @@
+{
+  "name": "ai-council",
+  "version": "1.0.0",
+  "description": "ChatGPT, Gemini, Claude, DeepSeek и Grok отвечают на вопрос, обсуждают ответы друг друга, а вы выбираете лучший или собираете итог из частей",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "demo": "MOCK=1 node server.js"
+  },
+  "engines": { "node": ">=20.12" },
+  "license": "MIT"
+}

@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Совет нейросетей</title>
+<style>
+  :root { --bg:#f6f7fb; --card:#fff; --text:#1d2433; --muted:#6b7385; --line:#e3e6ee; --accent:#4f46e5; --good:#15803d; --bad:#b91c1c; --sel:#eef2ff; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#12141a; --card:#1b1e27; --text:#e7e9ef; --muted:#9aa1b2; --line:#2c303c; --accent:#8b85ff; --good:#4ade80; --bad:#f87171; --sel:#262a45; } }
+  * { box-sizing: border-box; }
+  body { margin:0; font:15px/1.5 system-ui, sans-serif; background:var(--bg); color:var(--text); }
+  main { max-width:1200px; margin:0 auto; padding:24px 16px 64px; }
+  h1 { margin:0 0 4px; font-size:24px; } .sub { color:var(--muted); margin:0 0 20px; }
+  textarea { width:100%; min-height:90px; padding:12px; border:1px solid var(--line); border-radius:10px; background:var(--card); color:var(--text); font:inherit; }
+  .row { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin:12px 0; }
+  label.chip { display:flex; gap:6px; align-items:center; padding:6px 12px; border:1px solid var(--line); border-radius:999px; background:var(--card); cursor:pointer; }
+  label.chip.off { opacity:.45; cursor:not-allowed; }
+  button { padding:9px 16px; border:0; border-radius:10px; background:var(--accent); color:#fff; font:inherit; font-weight:600; cursor:pointer; }
+  button.ghost { background:transparent; color:var(--accent); border:1px solid var(--accent); }
+  button:disabled { opacity:.5; cursor:wait; }
+  select { padding:8px; border-radius:8px; border:1px solid var(--line); background:var(--card); color:var(--text); font:inherit; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:14px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; min-width:0; }
+  .card h3 { margin:0 0 8px; display:flex; justify-content:space-between; gap:8px; font-size:16px; }
+  .card.best { border-color:var(--good); box-shadow:0 0 0 2px color-mix(in srgb, var(--good) 30%, transparent); }
+  .meta { color:var(--muted); font-size:12px; font-weight:400; }
+  .part { padding:6px 8px; margin:4px -8px; border-radius:8px; cursor:pointer; border:1px dashed transparent; overflow-wrap:anywhere; }
+  .part:hover { border-color:var(--line); }
+  .part.sel { background:var(--sel); border-color:var(--accent); }
+  .err { color:var(--bad); }
+  .rev { border-top:1px solid var(--line); margin-top:10px; padding-top:8px; font-size:13px; }
+  .rev b { font-weight:600; } .plus { color:var(--good); } .minus { color:var(--bad); }
+  table { border-collapse:collapse; width:100%; } td, th { padding:6px 8px; border-bottom:1px solid var(--line); text-align:left; }
+  section { margin-top:28px; } h2 { font-size:18px; margin:0 0 10px; }
+  .hint { color:var(--muted); font-size:13px; }
+  .badge { background:var(--good); color:#fff; border-radius:6px; padding:1px 6px; font-size:12px; }
+  pre { white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Совет нейросетей</h1>
+  <p class="sub">ChatGPT · Gemini · Claude · DeepSeek · Grok — отвечают, обсуждают друг друга, а вы выбираете лучшее или собираете ответ по частям.</p>
+
+  <textarea id="q" placeholder="Ваш вопрос..."></textarea>
+  <div class="row" id="models"></div>
+  <div class="row">
+    <button id="btnAsk">1. Спросить всех</button>
+    <button id="btnDiscuss" class="ghost" disabled>2. Обсудить ответы</button>
+    <button id="btnRevise" class="ghost" disabled>3. Улучшить после критики</button>
+    <span id="status" class="hint"></span>
+  </div>
+
+  <section id="answersSec" hidden>
+    <h2>Ответы</h2>
+    <p class="hint">Нажимайте на абзацы, чтобы выбрать части для итогового ответа.</p>
+    <div class="grid" id="answers"></div>
+  </section>
+
+  <section id="rankSec" hidden>
+    <h2>Рейтинг по оценкам других нейросетей</h2>
+    <div class="card"><table id="rank"></table></div>
+  </section>
+
+  <section id="finalSec" hidden>
+    <h2>Итоговый ответ</h2>
+    <div class="row">
+      <button id="btnBest">Взять лучший</button>
+      <button id="btnParts" class="ghost">Собрать из выбранных частей (<span id="selCount">0</span>)</button>
+      <button id="btnAll" class="ghost">Лучшее из всех</button>
+      <label class="hint">Собирает: <select id="judge"></select></label>
+    </div>
+    <div class="card" id="final" hidden></div>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const state = { question: '', answers: [], reviews: [], ranking: [], selected: new Set(), models: [] };
+
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+const md = (s) => esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\n/g, '<br>');
+const splitParts = (text) => String(text).split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+
+async function api(path, body) {
+  const r = await fetch(path, body ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : {});
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.error || r.statusText);
+  return data;
+}
+
+function busy(on, msg = '') {
+  for (const b of document.querySelectorAll('button')) b.disabled = on;
+  if (!on) { $('btnDiscuss').disabled = !state.answers.length; $('btnRevise').disabled = !state.reviews.length; }
+  $('status').textContent = msg;
+}
+
+async function loadModels() {
+  const { models, mock } = await api('/api/models');
+  state.models = models;
+  $('models').innerHTML = models.map((m) => `
+    <label class="chip ${m.available ? '' : 'off'}" title="${esc(m.model)}">
+      <input type="checkbox" value="${m.id}" ${m.available ? 'checked' : 'disabled'}> ${esc(m.name)}
+    </label>`).join('') + (mock ? '<span class="hint">демо-режим (MOCK=1)</span>' : '');
+  $('judge').innerHTML = models.filter((m) => m.available).map((m) => `<option value="${m.id}">${esc(m.name)}</option>`).join('');
+}
+
+function renderAnswers() {
+  const bestId = state.ranking.find((r) => r.avg !== null)?.model;
+  $('answersSec').hidden = false;
+  $('answers').innerHTML = state.answers.map((a) => {
+    if (!a.ok) return `<div class="card"><h3>${esc(a.name)}</h3><p class="err">Ошибка: ${esc(a.error)}</p></div>`;
+    const parts = splitParts(a.text).map((p, i) => {
+      const key = `${a.model}:${i}`;
+      return `<div class="part ${state.selected.has(key) ? 'sel' : ''}" data-key="${key}">${md(p)}</div>`;
+    }).join('');
+    const r = state.ranking.find((x) => x.model === a.model);
+    const reviews = state.reviews.filter((rv) => rv.ok && rv.review).map((rv) => {
+      const it = (rv.review.reviews || []).find((x) => x.model === a.model);
+      if (!it) return '';
+      return `<div class="rev"><b>${esc(rv.name)}</b> — ${esc(it.score)}/10<br>
+        ${(it.strengths || []).map((s) => `<span class="plus">+ ${esc(s)}</span>`).join('<br>')}<br>
+        ${(it.weaknesses || []).map((s) => `<span class="minus">− ${esc(s)}</span>`).join('<br>')}</div>`;
+    }).join('');
+    return `<div class="card ${a.model === bestId ? 'best' : ''}">
+      <h3><span>${esc(a.name)} ${a.model === bestId ? '<span class="badge">лучший</span>' : ''}</span>
+      <span class="meta">${r?.avg != null ? `★ ${r.avg} · ` : ''}${a.ms ? (a.ms / 1000).toFixed(1) + ' с' : ''}</span></h3>
+      ${parts}${reviews}</div>`;
+  }).join('');
+  $('finalSec').hidden = false;
+  $('selCount').textContent = state.selected.size;
+}
+
+function renderRanking() {
+  $('rankSec').hidden = false;
+  const comments = state.reviews.map((r) => r.ok
+    ? (r.review ? `<tr><td>${esc(r.name)}</td><td colspan="3">${esc(r.review.comment || '')} <span class="hint">→ лучший: ${esc(state.models.find((m) => m.id === r.review.best)?.name || r.review.best || '—')}</span></td></tr>` : `<tr><td>${esc(r.name)}</td><td colspan="3" class="err">не удалось разобрать ответ</td></tr>`)
+    : `<tr><td>${esc(r.name)}</td><td colspan="3" class="err">${esc(r.error)}</td></tr>`).join('');
+  $('rank').innerHTML = `<tr><th>Модель</th><th>Средняя оценка</th><th>Голосов «лучший»</th><th>Оценки</th></tr>` +
+    state.ranking.map((r) => `<tr><td>${esc(r.name)}</td><td>${r.avg ?? '—'}</td><td>${r.votes}</td><td>${r.scores.join(', ')}</td></tr>`).join('') +
+    `<tr><th colspan="4">Мнения рецензентов</th></tr>` + comments;
+}
+
+$('answers').addEventListener('click', (e) => {
+  const el = e.target.closest('.part'); if (!el) return;
+  const k = el.dataset.key;
+  state.selected.has(k) ? state.selected.delete(k) : state.selected.add(k);
+  el.classList.toggle('sel');
+  $('selCount').textContent = state.selected.size;
+});
+
+$('btnAsk').onclick = async () => {
+  state.question = $('q').value.trim();
+  if (!state.question) return alert('Введите вопрос');
+  const models = [...document.querySelectorAll('#models input:checked')].map((i) => i.value);
+  busy(true, 'Нейросети думают...');
+  try {
+    state.answers = await api('/api/ask', { question: state.question, models });
+    Object.assign(state, { reviews: [], ranking: [], selected: new Set() });
+    $('rankSec').hidden = true; $('final').hidden = true;
+    renderAnswers();
+  } catch (e) { alert(e.message); }
+  busy(false);
+};
+
+$('btnDiscuss').onclick = async () => {
+  busy(true, 'Нейросети обсуждают ответы друг друга...');
+  try {
+    const d = await api('/api/discuss', { question: state.question, answers: state.answers });
+    Object.assign(state, d);
+    renderAnswers(); renderRanking();
+  } catch (e) { alert(e.message); }
+  busy(false);
+};
+
+$('btnRevise').onclick = async () => {
+  busy(true, 'Нейросети улучшают ответы с учётом критики...');
+  try {
+    state.answers = await api('/api/revise', { question: state.question, answers: state.answers, reviews: state.reviews });
+    Object.assign(state, { reviews: [], ranking: [], selected: new Set() });
+    $('rankSec').hidden = true;
+    renderAnswers();
+  } catch (e) { alert(e.message); }
+  busy(false);
+};
+
+async function finalize(body, msg) {
+  busy(true, msg);
+  try {
+    const r = await api('/api/synthesize', { question: state.question, answers: state.answers, ranking: state.ranking, judge: $('judge').value, ...body });
+    $('final').hidden = false;
+    const title = r.mode === 'best' ? `Лучший ответ — ${r.name}` : `Собрал(а): ${r.name}`;
+    $('final').innerHTML = `<h3>${esc(title)} <button class="ghost" id="copy">Копировать</button></h3><div>${md(r.text)}</div>`;
+    $('copy').onclick = () => navigator.clipboard.writeText(r.text);
+  } catch (e) { alert(e.message); }
+  busy(false);
+}
+
+$('btnBest').onclick = () => finalize({ mode: 'best' }, '');
+$('btnAll').onclick = () => finalize({ mode: 'all' }, 'Собираю лучшее из всех ответов...');
+$('btnParts').onclick = () => {
+  const parts = [...state.selected].map((k) => {
+    const [model, i] = k.split(':');
+    return { model, text: splitParts(state.answers.find((a) => a.model === model).text)[+i] };
+  });
+  finalize({ mode: 'parts', parts }, 'Собираю ответ из выбранных частей...');
+};
+
+loadModels().catch((e) => ($('status').textContent = e.message));
+</script>
+</body>
+</html>

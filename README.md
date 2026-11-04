@@ -1,0 +1,55 @@
+# Совет нейросетей (AI Council)
+
+ChatGPT, Gemini, Claude, DeepSeek и Grok отвечают на один вопрос, **обсуждают ответы друг друга** (сильные и слабые стороны, оценка от 1 до 10), могут **улучшить свои ответы после критики**, а вы выбираете:
+
+1. **Лучший ответ.** Его определяет средняя оценка от остальных нейросетей.
+2. **Части из разных ответов.** Нажимаете на нужные абзацы в любых ответах, и выбранная нейросеть собирает из них один связный текст.
+3. **Лучшее из всех.** Нейросеть-редактор сама объединяет сильные стороны всех ответов.
+
+## Запуск
+
+Нужен Node.js 20.12 или новее. Внешние зависимости не нужны.
+
+```bash
+cp .env.example .env     # вставьте свои API-ключи
+npm start                # откройте http://localhost:3000
+```
+
+Посмотреть без ключей (ответы-заглушки): `npm run demo`
+
+Где взять ключи:
+
+| Нейросеть | Переменная | Где получить |
+|---|---|---|
+| ChatGPT | `OPENAI_API_KEY` | platform.openai.com |
+| Gemini | `GEMINI_API_KEY` | aistudio.google.com |
+| Claude | `ANTHROPIC_API_KEY` | console.anthropic.com |
+| DeepSeek | `DEEPSEEK_API_KEY` | platform.deepseek.com |
+| Grok | `XAI_API_KEY` | console.x.ai |
+
+Нейросети без ключа просто не участвуют. Версию модели можно поменять переменными `*_MODEL` в `.env`.
+
+## API
+
+| Метод | Что делает | Тело запроса |
+|---|---|---|
+| `GET /api/models` | список нейросетей и есть ли ключ | — |
+| `POST /api/ask` | все отвечают параллельно | `{question, models?}` |
+| `POST /api/discuss` | каждая разбирает ответы других и выдаёт рейтинг | `{question, answers}` |
+| `POST /api/revise` | каждая улучшает свой ответ по критике | `{question, answers, reviews}` |
+| `POST /api/synthesize` | итоговый ответ | `{question, answers, mode: "best"\|"parts"\|"all", judge, parts?, ranking?}` |
+| `POST /api/council` | всё сразу: ответы, обсуждение, улучшение (раунды 1–3), лучший | `{question, models?, rounds?}` |
+
+Пример:
+
+```bash
+curl -X POST localhost:3000/api/council -H 'content-type: application/json' \
+  -d '{"question":"Как быстро выучить английский?","rounds":2}'
+```
+
+## Файлы
+
+- `src/providers.js` — подключение к 5 нейросетям
+- `src/council.js` — ответы, обсуждение, рейтинг, улучшение, сборка итога
+- `server.js` — HTTP-сервер
+- `public/index.html` — веб-интерфейс
