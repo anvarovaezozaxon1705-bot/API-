@@ -50,6 +50,16 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(status, { 'content-type': type });
     res.end(type.startsWith('application/json') ? JSON.stringify(data) : data);
   };
+  // Пароль на весь сайт (если задан APP_PASSWORD), чтобы чужие не тратили ваши ключи
+  const pass = process.env.APP_PASSWORD;
+  if (pass) {
+    const [, b64 = ''] = (req.headers.authorization || '').split(' ');
+    const given = Buffer.from(b64, 'base64').toString().split(':').slice(1).join(':');
+    if (given !== pass) {
+      res.writeHead(401, { 'www-authenticate': 'Basic realm="AI Council", charset="UTF-8"' });
+      return res.end('Нужен пароль');
+    }
+  }
   try {
     const url = new URL(req.url, 'http://x');
     if (req.method === 'GET' && url.pathname === '/api/models') return send(200, { mock: isMock(), models: listModels() });

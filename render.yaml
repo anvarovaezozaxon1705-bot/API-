@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: ai-council
+    runtime: node
+    plan: free
+    branch: claude/ai-models-comparison-api-knuis2
+    buildCommand: "true"
+    startCommand: node server.js
+    envVars:
+      - key: APP_PASSWORD
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: XAI_API_KEY
+        sync: false
