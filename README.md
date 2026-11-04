@@ -27,6 +27,8 @@ npm start                # откройте http://localhost:3000
 | DeepSeek | `DEEPSEEK_API_KEY` | platform.deepseek.com |
 | Grok | `XAI_API_KEY` | console.x.ai |
 
+**Бесплатно:** один ключ Gemini включает сразу трёх участников: Gemini Flash, Gemini Pro и Gemini Flash-Lite. Они отвечают и обсуждают друг друга.
+
 Нейросети без ключа просто не участвуют. Версию модели можно поменять переменными `*_MODEL` в `.env`.
 
 ## Чтобы было всегда под рукой: бесплатный сайт на Render

@@ -10,10 +10,23 @@ export const PROVIDERS = {
     model: () => env('OPENAI_MODEL', 'gpt-5'),
     call: (p) => openAICompatible('https://api.openai.com/v1/chat/completions', p),
   },
+  // Три модели Gemini работают от одного (бесплатного) ключа GEMINI_API_KEY
   gemini: {
-    name: 'Gemini',
+    name: 'Gemini Flash',
     keyVar: 'GEMINI_API_KEY',
     model: () => env('GEMINI_MODEL', 'gemini-2.5-flash'),
+    call: gemini,
+  },
+  gemini_pro: {
+    name: 'Gemini Pro',
+    keyVar: 'GEMINI_API_KEY',
+    model: () => env('GEMINI_PRO_MODEL', 'gemini-2.5-pro'),
+    call: gemini,
+  },
+  gemini_lite: {
+    name: 'Gemini Flash-Lite',
+    keyVar: 'GEMINI_API_KEY',
+    model: () => env('GEMINI_LITE_MODEL', 'gemini-2.5-flash-lite'),
     call: gemini,
   },
   claude: {
